@@ -5,3 +5,8 @@ CIBBot (ซิบบอท) is an AI-powered legal information assistant develop
 The project combines large language models with retrieval-augmented generation (RAG) from a legal knowledge base to provide conversational guidance. The final report documents the prototype's development and evaluation.
 
 **[Visit CIBBot](https://cib.go.th/CIBbot)**
+
+## Documents
+
+- [CIBBot Final Report](CIBBot%20Final%20Report.pdf)
+- [CIBBot presentation slides](2026-06-18%20CIBbot%20presentation.pdf)
