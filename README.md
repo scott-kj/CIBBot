@@ -1,134 +1,109 @@
 # CIBBot (ซิบบอท)
 
-**An AI-powered assistant for criminal complaint guidance and legal information in Thailand.**
+CIBBot is an AI assistant for criminal complaint guidance and legal information, developed for Thailand's Central Investigation Bureau (CIB). It helps people understand which laws may apply to an incident, where to seek help, and what documents or evidence to prepare.
 
-CIBBot is a project for Thailand's Central Investigation Bureau (CIB). It helps people understand an incident, find the appropriate complaint channel, prepare documents and evidence, and learn about relevant laws and their rights. It combines a large language model with retrieval from legal documents, police guidance, and agency information to produce conversational answers with references.
+The assistant retrieves information from legal documents, police guidance, and agency resources before generating an answer. This approach, known as retrieval-augmented generation (RAG), gives users practical guidance with references they can follow.
 
 **[Visit CIBBot](https://cib.go.th/CIBbot)**
 
-> **For international visitors:** Under CIB cybersecurity policy, the live service is restricted to access from within Thailand. Visitors outside Thailand who would like to try CIBBot can use a VPN with a server located in Thailand. The documentation in this GitHub repository is publicly accessible.
+> **For international visitors:** Under CIB cybersecurity policy, the live service is restricted to access from within Thailand. Visitors abroad who would like to try CIBBot can use a VPN with a server in Thailand. The documentation in this repository is publicly accessible.
 
-| Project document | Contents |
+| Document | Contents |
 | --- | --- |
-| [Final report](CIBBot%20Final%20Report.pdf) | Research, requirements, architecture, evaluation, and user documentation. |
-| [Presentation slides](2026-06-18%20CIBbot%20presentation.pdf) | Project goals, retrieval architecture, public services, and interface demonstrations. |
+| [Final report](CIBBot%20Final%20Report.pdf) | Research, requirements, architecture, evaluation, and user manual. |
+| [Presentation slides](2026-06-18%20CIBbot%20presentation.pdf) | Project goals, retrieval architecture, services, and interface demonstrations. |
 
-This repository publishes the project documentation. Application source code and deployment configuration are not included.
+This repository contains the project documentation. Application source code and deployment configuration are not included.
 
-## Purpose and users
+## What CIBBot does
 
-People seeking help may be unsure whether an incident is a criminal matter, which authority to contact, or what evidence to collect. CIBBot is intended to make that first step easier through plain-language, Thai-language interaction, while reducing repetitive enquiries handled by staff.
+For someone facing an unfamiliar legal problem, the first difficulty is often knowing where to start. CIBBot accepts questions and incident descriptions in Thai, then explains relevant procedures in everyday language. Its public-facing functions include:
 
-The project serves three groups:
+- Explaining potentially relevant offences, legal provisions, and people's rights.
+- Identifying appropriate agencies and complaint channels.
+- Suggesting documents and evidence to collect.
+- Answering questions about fraud, online crime, and other criminal matters.
+- Providing legal references and practical next steps.
 
-- **Members of the public:** ask legal and procedural questions, describe incidents, and receive preliminary guidance.
-- **Officers:** review conversations and AI-assisted case summaries to support follow-up.
-- **Administrators:** maintain the knowledge base, manage access, review feedback, and configure the service.
+The guidance is preliminary. Decisions that require professional judgment or action by an authority remain with the responsible officers.
 
-The system provides preliminary information. Questions requiring professional judgment or action by an authority remain matters for the responsible officers.
+Officers can review conversation history, add notes, and prepare AI-assisted incident reports for follow-up. Reports can be exported as PDF or DOCX files.
 
-## Main capabilities
-
-### Public assistance
-
-- Explain potentially relevant offences, legal provisions, and criminal complaint procedures.
-- Help users identify appropriate agencies and reporting channels.
-- Suggest documents and evidence to prepare.
-- Answer scenario-based questions about fraud, online crime, and other criminal matters.
-- Present relevant legal references and practical next steps in understandable language.
-
-### Staff and administration
-
-The report's user manual and the presentation demonstrate web chat, an embeddable chat widget, staff login, dashboards, a searchable document knowledge base, and conversation history. They also describe:
-
-- AI-assisted preliminary case reports, with PDF and DOCX export.
-- Knowledge-document organization and maintenance.
-- User feedback review and bot-personality settings.
-- Staff permissions, invitations, and audit records.
-
-The presentation also describes Grafana monitoring of GPU health, memory, and response times; GPU capacity management; and scheduled daily and weekly backups.
+Administrators maintain the searchable document library, review feedback, and configure the bot's responses. The user manual and slides also show staff login, dashboards, permissions, invitations, and audit records. Operational features described in the presentation include monitoring GPU health, memory, and response times, managing GPU capacity, and scheduling daily and weekly backups.
 
 ## Architecture
 
-The report describes a layered design:
-
-| Layer | Responsibility |
-| --- | --- |
-| **User interface** | Public chat and widget, plus officer and administrator interfaces. |
-| **Application** | Query processing, conversation management, service workflows, and access control. |
-| **Knowledge and AI** | Retrieve legal evidence, rank and combine results, and generate a contextual response. |
-| **Data and security** | Store application and knowledge data; support permissions, consent, and auditability. |
-
-The following diagram is a simplified synthesis of the report and presentation, showing the logical responsibilities of the main components.
+The documented architecture connects the public chat interface to a retrieval and response pipeline. Administrators maintain the knowledge used by that pipeline, while the application carries the user's question and conversation context through each stage.
 
 ```mermaid
-flowchart TD
-    User["Public user"] <--> Chat["Web chat / embedded widget"]
-    Chat --> Query["Query processing and conversation context"]
-    Query --> Retrieval["Hybrid retrieval: semantic + keyword"]
-    Admin["Knowledge administrators"] --> Sources["Legal documents, police guidance, agency information"]
-    Sources --> Retrieval
-    Sources --> Page["PageIndex / Law Section Index"]
-    Sources --> Graph["Knowledge Graph"]
-    Graph -. "related laws, cases and procedures" .-> Retrieval
-    Graph -.-> Page
-    Query -. "document and section lookup" .-> Page
-    Retrieval --> Rank["Reranking"]
-    Rank --> Context["Context fusion"]
-    Page --> Context
-    Context --> LLM["Language model"]
-    LLM --> Safety["Safety checks and response formatting"]
-    Safety --> Answer["Thai guidance, next steps and references"]
-    Answer --> Chat
+flowchart TB
+    U(["User question<br/>Web chat or widget"]) --> Q["Query processing<br/>Conversation context"]
+
+    subgraph KB["Knowledge preparation"]
+        A["Administrators"] --> D["Laws, police guidance<br/>and agency information"]
+        D --> I["Document preparation<br/>and indexing"]
+    end
+
+    subgraph RAG["Tri-RAG retrieval"]
+        H["Hybrid search<br/>Semantic + keyword"] --> R["Reranking"]
+        R --> P["PageIndex<br/>Document and section navigation"]
+        P --> C["Context fusion"]
+        K["Knowledge Graph"] -.-> H
+        K -.-> P
+    end
+
+    Q --> H
+    Q --> P
+    I -.-> H
+    I -.-> P
+    I -.-> K
+
+    subgraph GEN["Answer generation"]
+        L["Language model"] --> S["Safety checks<br/>and response formatting"]
+        S --> O(["Thai guidance<br/>Next steps and references"])
+    end
+
+    C --> GEN
+
+    classDef entry fill:#eff6ff,stroke:#2563eb,color:#172554;
+    classDef knowledge fill:#f1f5f9,stroke:#64748b,color:#0f172a;
+    classDef retrieval fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+    classDef answer fill:#ecfdf5,stroke:#059669,color:#064e3b;
+    class U,Q entry;
+    class A,D,I knowledge;
+    class H,R,P,C,K retrieval;
+    class L,S,O answer;
 ```
 
-### Retrieval and the Tri-RAG design
+Solid arrows show the processing flow. Dotted arrows supply indexed knowledge and relationships. The diagram summarizes the logical design described in the report and slides.
 
-The report calls its combined retrieval approach **Tri-RAG**:
+### How Tri-RAG retrieves evidence
 
-1. **Hybrid RAG:** combines semantic similarity with keyword retrieval. The report's design includes dense vector retrieval and sparse BM25 retrieval, followed by cross-encoder reranking.
-2. **PageIndex:** uses document structure and source locations to find and verify relevant passages. The presentation also identifies a **Law Section Index** for direct lookup of legal sections.
-3. **Knowledge Graph:** connects laws, offences, cases, agencies, procedures, and related documents. It enriches both hybrid retrieval and document navigation.
+The report calls the combined retrieval approach **Tri-RAG**. Its three components address different parts of a legal question:
 
-A **Safety Layer** is described before the final response. It uses rules and LLM-based review to check legal references, appropriateness, agency remit, and sensitive information, then adjusts the response before delivery.
-
-### Request flow
-
-1. A user asks a question or describes an incident.
-2. The application processes the query together with the conversation context.
-3. Retrieval gathers candidate passages from the legal knowledge base, using semantic, keyword, document-structure, and relationship information as appropriate.
-4. Reranking prioritizes relevant evidence, and context fusion combines it for the language model.
-5. The model produces an understandable response grounded in the selected material.
-6. Safety checks and response formatting prepare the guidance, references, and next steps for the user.
-
-The presentation labels the generation component **“CIB Advisor LLM.”** This is an architectural label, not a confirmed underlying model or model version.
-
-### Knowledge management
-
-Administrators maintain the source documents used by the assistant. The documented workflow covers document preparation, cleansing, normalization, indexing, and reindexing. Vector embeddings support semantic search, while extracted legal entities and relationships support the Knowledge Graph. Source/version management, feedback, and conversation review help maintain the knowledge base.
-
-The knowledge sources include Thai criminal and procedural laws, related legislation, Royal Thai Police orders and guidance, agency information, and complaint procedures. Keeping those sources current is part of operating the system.
-
-### Named technologies and integration points
-
-| Component | What the documents establish |
+| Component | Role |
 | --- | --- |
-| **PostgreSQL** | Named as the main database in the report's software-interface design. |
-| **Milvus** | Named as the vector database in that design. |
-| **Grafana** | Named in the presentation for monitoring GPU health, memory, and response times. |
-| **CIB Internal API** | A documented integration point for existing legal and knowledge systems. |
-| **Facebook Messenger API** | A documented integration point for handing conversations to officers. |
-| **LLM, embeddings, and reranker** | Described as AI components; this repository does not identify a reproducible deployed model configuration. |
+| Hybrid RAG | Finds relevant passages through semantic vector search and BM25 keyword search, then uses a cross-encoder reranker to prioritize the results. |
+| PageIndex | Follows the structure of source documents to identify relevant pages and sections and prepare context for the response. |
+| Knowledge Graph | Connects laws, offences, cases, agencies, procedures, and documents to support both hybrid retrieval and PageIndex. |
 
-Mobile applications, authorized external APIs, voice input, and additional messaging channels appear in the design or roadmap. Their inclusion here should not be read as confirmation that every channel is currently available.
+The query can reach both hybrid retrieval and PageIndex. Retrieved passages are ranked, examined in their document context, and combined before being passed to the language model. The presentation also describes a separate Law Section Index for direct lookup of statutory provisions.
 
-## Access, privacy, and human oversight
+### From evidence to an answer
 
-The documentation specifies differentiated public, officer, and administrator roles, consent notices, access control, and audit logging. Its requirements call for processing sensitive data within agency infrastructure and removing identifying information before reusing conversation-derived knowledge. Officers review AI-generated preliminary reports and handle cases requiring professional judgment.
+The language model uses the selected material and conversation context to explain the relevant law or procedure. The presentation calls this component "CIB Advisor LLM"; it does not specify a deployed model version.
+
+Before delivery, a Safety Layer uses rules and LLM-based review to check legal references, appropriateness, agency remit, and sensitive information. Response formatting then presents the guidance, next steps, and references through the chat interface. Where an incident needs more detail, the conversation can include follow-up questions.
+
+### Maintaining the knowledge base
+
+Administrators organize and update the source documents, which include Thai criminal and procedural laws, related legislation, Royal Thai Police orders, agency information, and complaint procedures.
+
+Document preparation covers cleansing, normalization, indexing, and reindexing. Vector embeddings support semantic search, while extracted legal entities and relationships populate the Knowledge Graph. Source and version management keeps material traceable; feedback and conversation review help identify missing or outdated information.
 
 ## Reported project evaluation
 
-The final report compares a baseline **LLM + Hybrid RAG** system with **CIB Advisor using LLM + Tri-RAG**, using the same questions and criteria.
+The final report compares a baseline LLM + Hybrid RAG system with CIB Advisor using LLM + Tri-RAG. Both were evaluated using the same questions and criteria.
 
 | Evaluation dimension | Baseline | CIB Advisor |
 | --- | ---: | ---: |
@@ -137,15 +112,17 @@ The final report compares a baseline **LLM + Hybrid RAG** system with **CIB Advi
 | SOP / procedure compliance | 92.0% | 92.0% |
 | Reported overall score | 91.1% | 93.4% |
 
-The evaluation used 70 answer-correctness questions, 88 retrieval questions, and 50 procedure-compliance questions. Scores were produced by AI against reference answers, with developers spot-checking at least 10%. These are the report's project-evaluation results, not an independent measurement of the live website. See **section 4.4.2, PDF pages 161–162**.
+The evaluation used 70 answer-correctness questions, 88 retrieval questions, and 50 procedure-compliance questions. AI scored responses against reference answers, and developers spot-checked at least 10%. These figures describe the project evaluation and should be read in that context. The method and results appear in section 4.4.2 of the [final report](CIBBot%20Final%20Report.pdf), PDF pages 161-162.
 
-## Project status and sources
+## Project status
 
-The materials document a developed and tested prototype, with interface demonstrations, a user manual, and project evaluation. The report concludes that the system is ready for deployment; the presentation records its testing stage. Future recommendations include additional mobile and messaging channels, Thai voice input, automated official-document ingestion, and further model and retrieval improvements.
+The report documents a developed and tested prototype and concludes that it is ready for deployment. The presentation records the service during testing and demonstrates its interfaces.
 
-The architecture and feature descriptions above are drawn from:
+Future recommendations include more mobile and messaging channels, Thai voice input, automated ingestion of official documents, and further improvements to models and retrieval. These remain roadmap items in the project materials.
 
-- **Final report:** executive summary; section **4.2** (architecture, system design, and functional requirements); and the user manual. The database and integration names appear in **4.2.3.1**.
-- **Presentation:** pages **7 and 12** (public services), **10–11** (retrieval and architecture), **13** (administration and operations), and **15–28** (interface demonstrations).
+## Sources
 
-The international-access note above is project-owner guidance. Other feature and architecture descriptions are based on the linked project documents. Page numbers refer to physical PDF pages. Read the [final report](CIBBot%20Final%20Report.pdf) and [slides](2026-06-18%20CIBbot%20presentation.pdf) for the underlying requirements, diagrams, and evaluation context.
+- [Final report](CIBBot%20Final%20Report.pdf): executive summary; section 4.2 for architecture and functional requirements; section 4.4.2 for evaluation; and the user manual.
+- [Presentation slides](2026-06-18%20CIBbot%20presentation.pdf): pages 7 and 12 for public services, 10-11 for retrieval and architecture, 13 for administration and operations, and 15-28 for interface demonstrations.
+
+Page references use physical PDF pages. The international-access note is guidance supplied by the repository owner.
