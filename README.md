@@ -33,73 +33,143 @@ Administrators maintain the searchable document library, review feedback, and co
 
 ## Architecture
 
-The documented architecture connects the public chat interface to a retrieval and response pipeline. Administrators maintain the knowledge used by that pipeline, while the application carries the user's question and conversation context through each stage.
+The system framework follows **Figure 33 in the final report** (section 4.2.3.2, printed page 129 / PDF page 131). It brings together the public chat service, administration, knowledge management, and data preparation. The AI answering pipeline sits within this wider framework.
+
+### System framework
+
+The overview separates the conversation workflow from the work needed to maintain its knowledge. Web/widget chat and staff tools are demonstrated in the user manual. CIB app integration, voice input, automatic agency updates, and officer handoff are design requirements or extension points in the report.
 
 ```mermaid
 flowchart TB
-    U(["User question<br/>Web chat or widget"]) --> Q["Query processing<br/>Conversation context"]
-
-    subgraph KB["Knowledge preparation"]
-        A["Administrators"] --> D["Laws, police guidance<br/>and agency information"]
-        D --> I["Document preparation<br/>and indexing"]
+    U(["End user<br/>Chat interface"])
+    
+    subgraph ADMIN["Administration"]
+        A["Login / registration"]
+        CH["Chat management<br/>History and testing"]
+        DOC["Knowledge management<br/>Edit documents / inspect references"]
+        INT["Channel integration<br/>Website / CIB app"]
+        A --> CH
+        A --> DOC
+        A --> INT
     end
 
-    subgraph RAG["Tri-RAG retrieval"]
-        H["Hybrid search<br/>Semantic + keyword"] --> R["Reranking"]
-        R --> P["PageIndex<br/>Document and section navigation"]
-        P --> C["Context fusion"]
-        K["Knowledge Graph"] -.-> H
-        K -.-> P
+    subgraph AI["AI / system services"]
+        MENU["Service menu<br/>Introduction and incident intake"]
+        RESP["Legal assistance<br/>Tri-RAG + response generation"]
+        STAFF["Officer handoff"]
+        OUT(["Guidance, next steps<br/>and references"])
+        MENU --> RESP --> OUT
+        MENU -.-> STAFF
+    end
+
+    subgraph DATA["Knowledge production"]
+        SRC["Laws and example cases<br/>Historical incidents<br/>Preliminary reports<br/>Anonymized chats / FAQs"]
+        PREP["Clean data and EDA<br/>Prepare and index for AI"]
+        KB[("Knowledge base")]
+        API["CIB data updates"]
+        SRC --> PREP --> KB
+        API -.-> PREP
+    end
+
+    U --> MENU
+    INT -.-> U
+    CH -. "test" .-> MENU
+    DOC --> SRC
+    CH -. "Chat-derived material" .-> DOC
+    KB --> RESP
+
+    classDef user fill:#eff6ff,stroke:#2563eb,color:#172554;
+    classDef admin fill:#f5f3ff,stroke:#7c3aed,color:#3b0764;
+    classDef data fill:#f1f5f9,stroke:#64748b,color:#0f172a;
+    classDef ai fill:#ecfdf5,stroke:#059669,color:#064e3b;
+    class U user;
+    class A,CH,DOC,INT admin;
+    class SRC,PREP,KB,API data;
+    class MENU,RESP,STAFF,OUT ai;
+    style ADMIN fill:#faf5ff,stroke:#c4b5fd,color:#3b0764
+    style DATA fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
+    style AI fill:#f0fdf4,stroke:#86efac,color:#064e3b
+```
+
+Solid arrows show the main workflow and knowledge inputs. Dotted arrows show channel setup, testing, conversation-derived material, agency updates, and the handoff route. Text and voice are the report's specified input modes; the overview groups them under the chat interface.
+
+| Area | Responsibilities in the report |
+| --- | --- |
+| User access and integration | Provide a chat interface through the website or external application, with channel configuration managed by administrators. |
+| Chat management | Maintain conversation sessions and history; provide a testing interface with access to processing context and cited sources. |
+| Knowledge management | Add, edit, delete, and version documents; inspect documents referenced in conversations; trigger reindexing and incorporate agency updates. |
+| AI service workflow | Introduce the service, offer a menu, ask for basic and incident information, generate guidance, or route the user to an officer. |
+| Knowledge production | Collect source material, clean and analyze it, and prepare searchable knowledge for the AI system. |
+
+Officers can use conversation history to prepare preliminary reports. Reusable FAQ material from those conversations enters knowledge preparation only after identifying information has been removed.
+
+### Knowledge production
+
+Figure 33 identifies four source groups: anonymized conversations used for FAQs, legal documents and example cases, historical incident reports, and preliminary investigation reports. Administrators maintain these materials alongside police guidance and agency information.
+
+The preparation flow follows Figure 33 and the report's knowledge-base, data-preparation, and AI requirements:
+
+1. Collect documents, reports, and approved conversation-derived material.
+2. Clean and normalize the data, then perform exploratory data analysis (EDA) and preparation for AI use.
+3. Create vector embeddings, search indexes, and legal entity relationships.
+4. Maintain the knowledge base through document updates, versioning, and reindexing.
+
+This flow makes the relationship between source collection, prepared data, and the knowledge base explicit.
+
+### Tri-RAG and response generation
+
+The legal-assistance component in the overview expands into the pipeline below. It combines the report's Tri-RAG design (Figure 39) with the retrieval and response stages in Figure 30 and presentation pages 10-11.
+
+```mermaid
+flowchart TB
+    Q(["Question and conversation context"])
+    KB[("Prepared knowledge base")]
+
+    subgraph RET["Tri-RAG retrieval"]
+        KG["Knowledge Graph<br/>Legal entities and relationships"]
+        H["Hybrid RAG<br/>BM25 + vector search + reranking"]
+        P["PageIndex<br/>Document structure and section lookup"]
+        C["Context fusion"]
+        H --> P --> C
+        KG -.-> H
+        KG -.-> P
     end
 
     Q --> H
     Q --> P
-    I -.-> H
-    I -.-> P
-    I -.-> K
+    KB -.-> H
+    KB -.-> P
+    KB -.-> KG
 
-    subgraph GEN["Answer generation"]
-        L["Language model"] --> S["Safety checks<br/>and response formatting"]
-        S --> O(["Thai guidance<br/>Next steps and references"])
-    end
+    L["Language model<br/>Response generation"] --> S["Safety checks<br/>and response formatting"]
+    S --> R(["Thai guidance<br/>Next steps and references"])
 
-    C --> GEN
+    C --> L
 
-    classDef entry fill:#eff6ff,stroke:#2563eb,color:#172554;
+    classDef query fill:#eff6ff,stroke:#2563eb,color:#172554;
     classDef knowledge fill:#f1f5f9,stroke:#64748b,color:#0f172a;
     classDef retrieval fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
     classDef answer fill:#ecfdf5,stroke:#059669,color:#064e3b;
-    class U,Q entry;
-    class A,D,I knowledge;
-    class H,R,P,C,K retrieval;
-    class L,S,O answer;
+    class Q query;
+    class KB knowledge;
+    class KG,H,P,C retrieval;
+    class L,S,R answer;
+    style RET fill:#f0f9ff,stroke:#7dd3fc,color:#0c4a6e
 ```
 
-Solid arrows show the processing flow. Dotted arrows supply indexed knowledge and relationships. The diagram summarizes the logical design described in the report and slides.
-
-### How Tri-RAG retrieves evidence
-
-The report calls the combined retrieval approach **Tri-RAG**. Its three components address different parts of a legal question:
+Solid arrows carry the query and response through the pipeline. Dotted arrows supply indexed knowledge and legal relationships.
 
 | Component | Role |
 | --- | --- |
-| Hybrid RAG | Finds relevant passages through semantic vector search and BM25 keyword search, then uses a cross-encoder reranker to prioritize the results. |
-| PageIndex | Follows the structure of source documents to identify relevant pages and sections and prepare context for the response. |
-| Knowledge Graph | Connects laws, offences, cases, agencies, procedures, and documents to support both hybrid retrieval and PageIndex. |
+| Hybrid RAG | Combines BM25 keyword search with semantic vector search, then reranks passages by relevance. |
+| PageIndex | Uses document structure to identify relevant pages and sections and develop the context for an answer. |
+| Knowledge Graph | Connects laws, offences, cases, agencies, procedures, and documents to support both Hybrid RAG and PageIndex. |
+| Context fusion | Combines the selected evidence for the language model. |
+| Response generation | Produces Thai guidance, applies checks, and formats next steps and references for the user. |
 
-The query can reach both hybrid retrieval and PageIndex. Retrieved passages are ranked, examined in their document context, and combined before being passed to the language model. The presentation also describes a separate Law Section Index for direct lookup of statutory provisions.
+The question and conversation context can reach both Hybrid RAG and PageIndex. The Knowledge Graph supports both paths. The presentation also identifies a separate Law Section Index for direct lookup of statutory provisions.
 
-### From evidence to an answer
-
-The language model uses the selected material and conversation context to explain the relevant law or procedure. The presentation calls this component "CIB Advisor LLM"; it does not specify a deployed model version.
-
-Before delivery, a Safety Layer uses rules and LLM-based review to check legal references, appropriateness, agency remit, and sensitive information. Response formatting then presents the guidance, next steps, and references through the chat interface. Where an incident needs more detail, the conversation can include follow-up questions.
-
-### Maintaining the knowledge base
-
-Administrators organize and update the source documents, which include Thai criminal and procedural laws, related legislation, Royal Thai Police orders, agency information, and complaint procedures.
-
-Document preparation covers cleansing, normalization, indexing, and reindexing. Vector embeddings support semantic search, while extracted legal entities and relationships populate the Knowledge Graph. Source and version management keeps material traceable; feedback and conversation review help identify missing or outdated information.
+The language model, labeled "CIB Advisor LLM" in the presentation, uses the selected evidence to explain the relevant law or procedure. A Safety Layer checks legal references, appropriateness, agency remit, and sensitive information before the response is delivered. Follow-up questions collect missing incident details when needed.
 
 ## Reported project evaluation
 
